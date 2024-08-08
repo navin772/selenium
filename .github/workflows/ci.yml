@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - trunk
+      - test-mypy-errors
   schedule:
     - cron: "0 */12 * * *"
   workflow_dispatch:
