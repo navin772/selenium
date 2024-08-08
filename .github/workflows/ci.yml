@@ -64,12 +64,12 @@ jobs:
     name: Python
     needs: check
     uses: ./.github/workflows/ci-python.yml
-    if: >
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      contains(needs.check.outputs.targets, '//py') ||
-      contains(join(github.event.commits.*.message), '[py]') ||
-      contains(github.event.pull_request.title, '[py]')
+    # if: >
+    #   github.event_name == 'schedule' ||
+    #   github.event_name == 'workflow_dispatch' ||
+    #   contains(needs.check.outputs.targets, '//py') ||
+    #   contains(join(github.event.commits.*.message), '[py]') ||
+    #   contains(github.event.pull_request.title, '[py]')
 
   ruby:
     name: Ruby
