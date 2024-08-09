@@ -16,9 +16,9 @@
 # under the License.
 
 import uuid
-from typing import Optional
-from typing import List
 from typing import Any
+from typing import List
+from typing import Optional
 
 class InputDevice:
     """Describes the input device being used for the action."""
