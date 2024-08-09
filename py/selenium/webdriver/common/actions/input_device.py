@@ -17,21 +17,22 @@
 
 import uuid
 from typing import Optional
-
+from typing import List
+from typing import Any
 
 class InputDevice:
     """Describes the input device being used for the action."""
 
     def __init__(self, name: Optional[str] = None):
         self.name = name or uuid.uuid4()
-        self.actions = []
+        self.actions: List[Any] = []
 
-    def add_action(self, action):
+    def add_action(self, action: Any) -> None:
         """"""
         self.actions.append(action)
 
-    def clear_actions(self):
+    def clear_actions(self) -> None:
         self.actions = []
 
-    def create_pause(self, duration: int = 0):
+    def create_pause(self, duration: int = 0) -> None:
         pass
