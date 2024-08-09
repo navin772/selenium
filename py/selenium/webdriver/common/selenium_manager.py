@@ -67,9 +67,11 @@ class SeleniumManager:
         if exe is not None:
             compiled_path = compiled_path.with_suffix(exe)
 
-        if (path := os.getenv("SE_MANAGER_PATH")) is not None:
-            logger.debug("Selenium Manager set by env SE_MANAGER_PATH to: %s", path)
-            path = Path(path)
+        path: Optional[Path] = None
+
+        if (env_path := os.getenv("SE_MANAGER_PATH")) is not None:
+            logger.debug("Selenium Manager set by env SE_MANAGER_PATH to: %s", env_path)
+            path = Path(env_path)
         elif compiled_path.exists():
             path = compiled_path
         else:
@@ -92,7 +94,7 @@ class SeleniumManager:
 
             path = Path(__file__).parent.joinpath(location)
 
-        if not path.is_file():
+        if path is None or not path.is_file():
             raise WebDriverException(f"Unable to obtain working Selenium Manager binary; {path}")
 
         logger.debug("Selenium Manager binary found at: %s", path)
