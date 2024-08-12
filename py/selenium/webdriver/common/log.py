@@ -84,7 +84,7 @@ class Log:
         )
         self.driver.pin_script(self._mutation_listener_js, script_key)
         self.driver.execute_script(f"return {self._mutation_listener_js}")
-        
+
         event: Dict[str, Any] = {}
         async with runtime.wait_for(self.devtools.runtime.BindingCalled) as evnt:
             yield event
