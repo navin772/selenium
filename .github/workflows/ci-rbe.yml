@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - trunk
+      - test-py-selenium
   workflow_dispatch:
 
 jobs:
