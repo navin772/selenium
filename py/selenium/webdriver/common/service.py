@@ -1,19 +1,3 @@
-# Licensed to the Software Freedom Conservancy (SFC) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The SFC licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
 import errno
 import logging
 import os
@@ -54,6 +38,7 @@ class Service(ABC):
         env: typing.Optional[typing.Mapping[typing.Any, typing.Any]] = None,
         **kwargs,
     ) -> None:
+        self.log_output: typing.Optional[typing.Union[int, IOBase]] = None
         if isinstance(log_output, str):
             self.log_output = open(log_output, "a+", encoding="utf-8")
         elif log_output == subprocess.STDOUT:
@@ -82,7 +67,7 @@ class Service(ABC):
 
     @property
     def path(self) -> str:
-        return self._path
+        return self._path or ""
 
     @path.setter
     def path(self, value: str) -> None:
@@ -95,6 +80,8 @@ class Service(ABC):
          - WebDriverException : Raised either when it can't start the service
            or when it can't connect to the service
         """
+        if self._path is None:
+            raise WebDriverException("Service path cannot be None.")
         self._start_process(self._path)
 
         count = 0
@@ -202,7 +189,9 @@ class Service(ABC):
             start_info = None
             if system() == "Windows":
                 start_info = subprocess.STARTUPINFO()
-                start_info.dwFlags = subprocess.CREATE_NEW_CONSOLE | subprocess.STARTF_USESHOWWINDOW
+                start_info.dwFlags = (
+                    subprocess.CREATE_NEW_CONSOLE | subprocess.STARTF_USESHOWWINDOW
+                )
                 start_info.wShowWindow = subprocess.SW_HIDE
 
             self.process = subprocess.Popen(
@@ -227,6 +216,8 @@ class Service(ABC):
             raise
         except OSError as err:
             if err.errno == errno.EACCES:
+                if self._path is None:
+                    raise WebDriverException("Service path cannot be None.")
                 raise WebDriverException(
                     f"'{os.path.basename(self._path)}' executable may have wrong permissions."
                 ) from err
