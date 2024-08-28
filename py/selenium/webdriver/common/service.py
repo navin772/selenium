@@ -25,6 +25,7 @@ from io import IOBase
 from platform import system
 from subprocess import PIPE
 from time import sleep
+from typing import cast
 from urllib import request
 from urllib.error import URLError
 
@@ -56,11 +57,11 @@ class Service(ABC):
     ) -> None:
         self.log_output: typing.Optional[typing.Union[int, IOBase]] = None
         if isinstance(log_output, str):
-            self.log_output = open(log_output, "a+", encoding="utf-8")
+            self.log_output = cast(IOBase, open(log_output, "a+", encoding="utf-8"))
         elif log_output == subprocess.STDOUT:
-            self.log_output = None
+            self.log_output = cast(typing.Optional[typing.Union[int, IOBase]], None)
         elif log_output is None or log_output == subprocess.DEVNULL:
-            self.log_output = subprocess.DEVNULL
+            self.log_output = cast(typing.Optional[typing.Union[int, IOBase]], subprocess.DEVNULL)
         else:
             self.log_output = log_output
 
@@ -204,16 +205,16 @@ class Service(ABC):
         try:
             start_info = None
             if system() == "Windows":
-                start_info = subprocess.STARTUPINFO()
-                start_info.dwFlags = subprocess.CREATE_NEW_CONSOLE | subprocess.STARTF_USESHOWWINDOW
-                start_info.wShowWindow = subprocess.SW_HIDE
+                start_info = subprocess.STARTUPINFO()  # type: ignore[attr-defined]
+                start_info.dwFlags = subprocess.CREATE_NEW_CONSOLE | subprocess.STARTF_USESHOWWINDOW  # type: ignore[attr-defined]
+                start_info.wShowWindow = subprocess.SW_HIDE  # type: ignore[attr-defined]
 
             self.process = subprocess.Popen(
                 cmd,
                 env=self.env,
                 close_fds=close_file_descriptors,
-                stdout=self.log_output,
-                stderr=self.log_output,
+                stdout=cast(typing.Optional[typing.Union[int, typing.IO[typing.Any]]], self.log_output),
+                stderr=cast(typing.Optional[typing.Union[int, typing.IO[typing.Any]]], self.log_output),
                 stdin=PIPE,
                 creationflags=self.creation_flags,
                 startupinfo=start_info,
