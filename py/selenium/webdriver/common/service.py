@@ -189,9 +189,7 @@ class Service(ABC):
             start_info = None
             if system() == "Windows":
                 start_info = subprocess.STARTUPINFO()
-                start_info.dwFlags = (
-                    subprocess.CREATE_NEW_CONSOLE | subprocess.STARTF_USESHOWWINDOW
-                )
+                start_info.dwFlags = subprocess.CREATE_NEW_CONSOLE | subprocess.STARTF_USESHOWWINDOW
                 start_info.wShowWindow = subprocess.SW_HIDE
 
             self.process = subprocess.Popen(
