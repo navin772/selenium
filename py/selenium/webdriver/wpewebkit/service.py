@@ -20,8 +20,6 @@ import typing
 from selenium.webdriver.common import service
 
 DEFAULT_EXECUTABLE_PATH = shutil.which("WPEWebDriver")
-if DEFAULT_EXECUTABLE_PATH is None:
-    raise ValueError("WPEWebDriver executable not found in PATH")
 
 
 class Service(service.Service):
