@@ -34,3 +34,8 @@ urllib3[socks]==2.0.7
 websocket-client==1.8.0
 wsproto==1.2.0
 zipp==3.17.0
+isort==5.13.2
+black==24.1.1
+flake8==6.1.0
+flake8-typing-imports==1.14.0
+docformatter==1.7.5

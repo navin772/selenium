@@ -2,6 +2,22 @@ workspace(name = "selenium")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
+# Update rules_python to a more stable version
+http_archive(
+    name = "rules_python",
+    urls = ["https://github.com/bazelbuild/rules_python/releases/download/0.21.0/rules_python-0.21.0.tar.gz"],
+    sha256 = "9cbfa15864904d732e8d41870d620c2a157eaa688b3e4c8afab0bde1247ac086",
+)
+
+# Load pip_install from rules_python
+load("@rules_python//python:pip.bzl", "pip_install")
+
+# Install Python development dependencies using pip_install
+pip_install(
+    name = "py_dev_requirements",
+    requirements = "//py:requirements.txt",
+)
+
 # rules_closure are not published to BCR.
 
 http_archive(
@@ -46,7 +62,7 @@ rust_register_toolchains()
 
 load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 
-crates_repository(
+crate_repositories(
     name = "crates",
     cargo_lockfile = "//rust:Cargo.lock",
     lockfile = "//rust:Cargo.Bazel.lock",

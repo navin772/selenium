@@ -10,6 +10,31 @@ load("//py:defs.bzl", "generate_devtools", "py_test_suite")
 load("//py/private:browsers.bzl", "BROWSERS")
 load("//py/private:import.bzl", "py_import")
 
+compile_pip_requirements(
+    name = "py_dev_requirements",
+    requirements_in = ":requirements.txt",
+    requirements_txt = ":requirements_lock.txt",
+)
+
+py_binary(
+    name = "python-lint",
+    srcs = [],
+    main = None,
+    args = [
+        "isort", "selenium/", "test/", "conftest.py",
+        "black", "selenium/", "test/", "conftest.py", "-l", "120",
+        "flake8", "selenium/", "test/", "--min-python-version=3.8",
+        "docformatter", "--in-place", "-r", "selenium/"
+    ],
+    deps = [
+        requirement("black"),
+        requirement("isort"),
+        requirement("flake8"),
+        requirement("flake8-typing-imports"),
+        requirement("docformatter"),
+    ],
+)
+
 py_binary(
     name = "selenium-release",
     srcs = [

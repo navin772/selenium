@@ -31,5 +31,11 @@ section "Rust"
 echo "   rustfmt" >&2
 bazel run @rules_rust//:rustfmt
 
+section "Python"
+echo "    python - isort, black, flake8, docformatter" >&2
+bazel run //py:python-lint
+# TOXENV=linting
+# tox -c py/tox.ini
+
 section "Copyright"
 bazel run //scripts:update_copyright
