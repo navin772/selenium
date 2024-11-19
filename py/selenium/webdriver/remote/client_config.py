@@ -42,6 +42,7 @@ class ClientConfig:
         ignore_certificates: Optional[bool] = False,
         init_args_for_pool_manager: Optional[dict] = None,
         timeout: Optional[int] = None,
+        maxsize: Optional[int] = 10,
         ca_certs: Optional[str] = None,
         username: Optional[str] = None,
         password: Optional[str] = None,
@@ -56,6 +57,7 @@ class ClientConfig:
         self.ignore_certificates = ignore_certificates
         self.init_args_for_pool_manager = init_args_for_pool_manager or {}
         self.timeout = timeout
+        self.maxsize = maxsize
         self.username = username
         self.password = password
         self.auth_type = auth_type
@@ -164,6 +166,20 @@ class ClientConfig:
          - value: the timeout (in seconds) to use to communicate with the driver or server
         """
         self._timeout = timeout
+
+    @property
+    def maxsize(self) -> int:
+        """:Returns: The maxsize used for the connection pool."""
+        return self._maxsize
+
+    @maxsize.setter
+    def maxsize(self, maxsize: int) -> None:
+        """Provides the maxsize for the connection pool.
+
+        :Args:
+         - value: the maxsize to use for the connection pool
+        """
+        self._maxsize = maxsize
 
     def reset_timeout(self) -> None:
         """Resets the timeout to the default value of socket."""

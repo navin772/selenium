@@ -279,7 +279,10 @@ class RemoteConnection:
         return proxy_without_auth, auth
 
     def _get_connection_manager(self):
-        pool_manager_init_args = {"timeout": self._client_config.timeout}
+        pool_manager_init_args = {
+            "timeout": self._client_config.timeout,
+            "maxsize": self._client_config.maxsize,
+        }
         pool_manager_init_args.update(
             self._client_config.init_args_for_pool_manager.get("init_args_for_pool_manager", {})
         )

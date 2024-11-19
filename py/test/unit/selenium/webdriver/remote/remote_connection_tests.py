@@ -529,3 +529,15 @@ def test_connection_manager_with_custom_args_via_client_config():
     assert isinstance(conn, urllib3.PoolManager)
     assert conn.connection_pool_kw["retries"] == retries
     assert conn.connection_pool_kw["timeout"] == timeout
+
+
+def test_connection_manager_with_pool_maxsize_via_client_config():
+    pool_maxsize = 20
+    client_config = ClientConfig(
+        remote_server_addr="http://localhost:4444",
+        init_args_for_pool_manager={"init_args_for_pool_manager": {"maxsize": pool_maxsize}},
+    )
+    remote_connection = RemoteConnection(client_config=client_config)
+    conn = remote_connection._get_connection_manager()
+    assert isinstance(conn, urllib3.PoolManager)
+    assert conn.connection_pool_kw["maxsize"] == pool_maxsize
