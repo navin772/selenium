@@ -1,0 +1,5 @@
+# Configuration for Chrome Beta
+build:chrome_beta --//common:chrome_beta=true
+
+# Run JS tests with Chrome Beta
+build:js_chrome_beta --config=chrome_beta
