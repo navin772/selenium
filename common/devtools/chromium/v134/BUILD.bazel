@@ -1,0 +1,22 @@
+package(
+    default_visibility = [
+        "//dotnet/src/webdriver:__subpackages__",
+        "//java/src/org/openqa/selenium/devtools:__subpackages__",
+        "//javascript/node/selenium-webdriver:__pkg__",
+        "//py:__pkg__",
+        "//rb/lib/selenium/devtools:__pkg__",
+    ],
+)
+
+# Using the existing JSON files directly
+filegroup(
+    name = "browser_protocol",
+    srcs = ["browser_protocol.json"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "js_protocol",
+    srcs = ["js_protocol.json"],
+    visibility = ["//visibility:public"],
+)
