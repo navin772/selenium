@@ -1616,6 +1616,9 @@ pub fn get_manager_by_browser(browser_name: String) -> Result<Box<dyn SeleniumMa
     } else if IE_NAMES.contains(&browser_name_lower_case.as_str()) {
         Ok(IExplorerManager::new()?)
     } else if browser_name_lower_case.eq(SAFARI_NAME) {
+        if !MACOS.is(env::consts::OS) {
+            return Err(anyhow!("Safari is only available on macOS systems"));
+        }
         Ok(SafariManager::new()?)
     } else if SAFARITP_NAMES.contains(&browser_name_lower_case.as_str()) {
         Ok(SafariTPManager::new()?)
@@ -1634,6 +1637,9 @@ pub fn get_manager_by_driver(driver_name: String) -> Result<Box<dyn SeleniumMana
     } else if driver_name.eq_ignore_ascii_case(IEDRIVER_NAME) {
         Ok(IExplorerManager::new()?)
     } else if driver_name.eq_ignore_ascii_case(SAFARIDRIVER_NAME) {
+        if !MACOS.is(env::consts::OS) {
+            return Err(anyhow!("safaridriver is only available on macOS systems"));
+        }
         Ok(SafariManager::new()?)
     } else {
         Err(anyhow!(format!("Invalid driver name: {driver_name}")))

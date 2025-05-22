@@ -46,6 +46,13 @@ pub struct SafariManager {
 
 impl SafariManager {
     pub fn new() -> Result<Box<Self>, Error> {
+        // Safari is only supported on macOS, fail early if on other OS
+        if !MACOS.is(std::env::consts::OS) {
+            return Err(anyhow!(
+                "Safari and safaridriver are only available on macOS"
+            ));
+        }
+
         let browser_name = SAFARI_NAME;
         let driver_name = SAFARIDRIVER_NAME;
         let config = ManagerConfig::default(browser_name, driver_name);
@@ -110,6 +117,11 @@ impl SeleniumManager for SafariManager {
     }
 
     fn get_driver_path_in_cache(&self) -> Result<PathBuf, Error> {
+        if !MACOS.is(std::env::consts::OS) {
+            return Err(anyhow!(
+                "Safari and safaridriver are only available on macOS"
+            ));
+        }
         Ok(PathBuf::from("/usr/bin/safaridriver"))
     }
 

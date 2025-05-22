@@ -32,3 +32,38 @@ fn safari_test() {
         safari_assert.failure();
     }
 }
+
+#[test]
+fn safari_non_macos_safety_test() {
+    if !OS.eq("macos") {
+        // Test for proper error message with --browser safari
+        let mut cmd = get_selenium_manager();
+        let output = cmd
+            .args(["--browser", "safari"])
+            .output()
+            .expect("Failed to execute command");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains("Safari is only available on macOS systems"));
+
+        // Test for proper error message with --driver safaridriver
+        let mut cmd = get_selenium_manager();
+        let output = cmd
+            .args(["--driver", "safaridriver"])
+            .output()
+            .expect("Failed to execute command");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains("safaridriver is only available on macOS systems"));
+
+        // Test that no system directory locks are attempted (with --debug to see detailed logs)
+        let mut cmd = get_selenium_manager();
+        let output = cmd
+            .args(["--browser", "safari", "--debug"])
+            .output()
+            .expect("Failed to execute command");
+        let stderr_str = String::from_utf8_lossy(&output.stderr);
+
+        // Verify we're not seeing any attempt to acquire lock in /bin/ or /usr/bin/
+        assert!(!stderr_str.contains("Acquiring lock: /bin/"));
+        assert!(!stderr_str.contains("Acquiring lock: /usr/bin/"));
+    }
+}
