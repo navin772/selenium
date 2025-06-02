@@ -58,6 +58,7 @@ from selenium.webdriver.common.virtual_authenticator import (
 from selenium.webdriver.support.relative_locator import RelativeBy
 
 from ..common.fedcm.dialog import Dialog
+from .bidi_bridge import BiDiBridge
 from .bidi_connection import BidiConnection
 from .client_config import ClientConfig
 from .command import Command
@@ -253,10 +254,8 @@ class WebDriver(BaseWebDriver):
         self.locator_converter = locator_converter or LocatorConverter()
         self._web_element_cls = web_element_cls or self._web_element_cls
         self._authenticator_id = None
-        self.start_client()
-        self.start_session(capabilities)
-        self._fedcm = FedCM(self)
-
+        
+        # Initialize BiDi-related attributes before starting session
         self._websocket_connection = None
         self._script = None
         self._network = None
@@ -265,6 +264,11 @@ class WebDriver(BaseWebDriver):
         self._browsing_context = None
         self._storage = None
         self._webextension = None
+        self._bidi_bridge = None
+        
+        self.start_client()
+        self.start_session(capabilities)
+        self._fedcm = FedCM(self)
 
     def __repr__(self):
         return f'<{type(self).__module__}.{type(self).__name__} (session="{self.session_id}")>'
@@ -356,6 +360,16 @@ class WebDriver(BaseWebDriver):
             response = self.execute(Command.NEW_SESSION, caps)["value"]
             self.session_id = response.get("sessionId")
             self.caps = response.get("capabilities")
+            
+            # Initialize BiDi connection if available
+            if self.caps.get("webSocketUrl"):
+                try:
+                    self._start_bidi()
+                    print(f"BiDi WebSocket connection initialized: {self._websocket_connection is not None}")
+                except Exception as e:
+                    print(f"Failed to initialize BiDi connection: {e}")
+                    # Don't fail the session if BiDi initialization fails
+                    pass
         except Exception:
             if hasattr(self, "service") and self.service is not None:
                 self.service.stop()
@@ -434,6 +448,23 @@ class WebDriver(BaseWebDriver):
         --------
           dict - The command's JSON response loaded into a dictionary object.
         """
+        # Initialize BiDi bridge if not already done and BiDi is available
+        if self._bidi_bridge is None and self._should_attempt_bidi():
+            try:
+                self._bidi_bridge = BiDiBridge(self)
+            except Exception:
+                # If BiDi bridge initialization fails, continue with classic execution
+                pass
+
+        # Use BiDi bridge for command execution if available
+        if self._bidi_bridge is not None:
+            try:
+                return self._bidi_bridge.execute_with_fallback(driver_command, params)
+            except Exception:
+                # If BiDi bridge fails completely, fall back to original logic
+                pass
+
+        # Original classic execution logic
         params = self._wrap_value(params)
 
         if self.session_id:
@@ -450,6 +481,51 @@ class WebDriver(BaseWebDriver):
         # If the server doesn't send a response, assume the command was
         # a success
         return {"success": 0, "value": None, "sessionId": self.session_id}
+
+    def _should_attempt_bidi(self) -> bool:
+        """Determine if BiDi should be attempted for this session.
+
+        Returns:
+            True if BiDi is available and should be attempted, False otherwise.
+        """
+        return (
+            self.caps.get("webSocketUrl") is not None
+            and self.session_id is not None
+        )
+
+    @property
+    def bidi_bridge(self):
+        """Returns the BiDi bridge for advanced configuration.
+
+        This property provides access to the BiDi bridge for users who want to:
+        - Configure BiDi command execution behavior
+        - Enable/disable BiDi for specific commands
+        - Monitor BiDi usage statistics
+        - Enable debug logging
+
+        Returns:
+        --------
+        BiDiBridge: The BiDi bridge instance, or None if BiDi is not available.
+
+        Examples:
+        ---------
+        >>> # Disable BiDi for specific commands
+        >>> driver.bidi_bridge.disable_bidi_for_command(Command.GET_COOKIES)
+        >>>
+        >>> # Enable debug logging
+        >>> driver.bidi_bridge.enable_debug_logging()
+        >>>
+        >>> # Get usage statistics
+        >>> stats = driver.bidi_bridge.get_statistics()
+        >>> print(f"BiDi success rate: {stats['bidi_success_rate']:.1f}%")
+        """
+        if self._bidi_bridge is None and self._should_attempt_bidi():
+            try:
+                self._bidi_bridge = BiDiBridge(self)
+            except Exception:
+                # If BiDi bridge initialization fails, return None
+                return None
+        return self._bidi_bridge
 
     def get(self, url: str) -> None:
         """Navigate the browser to the specified URL in the current window or
@@ -469,6 +545,7 @@ class WebDriver(BaseWebDriver):
         >>> driver = webdriver.Chrome()
         >>> driver.get("https://example.com")
         """
+        print("Inside classic get method")
         self.execute(Command.GET, {"url": url})
 
     @property
