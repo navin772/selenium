@@ -411,6 +411,7 @@ class BrowsingContext:
         -------
             List[BrowsingContextInfo]: A list of browsing context information.
         """
+        print("Inside bidi browsingContext.get_tree method")
         params = {}
         if max_depth is not None:
             params["maxDepth"] = max_depth
@@ -493,6 +494,7 @@ class BrowsingContext:
         -------
             Dict: A dictionary containing the navigation result.
         """
+        print("Inside bidi browsingContext.navigate method")
         params = {"context": context, "url": url}
         if wait is not None:
             params["wait"] = wait
@@ -536,6 +538,7 @@ class BrowsingContext:
             "scale": scale,
             "shrinkToFit": shrink_to_fit,
         }
+        print("Inside bidi browsingContext.print method")
         if margin is not None:
             params["margin"] = margin
         if page is not None:

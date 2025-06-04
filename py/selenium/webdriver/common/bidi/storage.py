@@ -357,6 +357,7 @@ class Storage:
         -------
             GetCookiesResult: The result of the get cookies command.
         """
+        print("Inside bidi get_cookies method")
         params = {}
         if filter is not None:
             params["filter"] = filter.to_dict()
@@ -382,6 +383,7 @@ class Storage:
         -------
             SetCookieResult: The result of the set cookie command.
         """
+        print("Inside bidi set_cookies method")
         params = {"cookie": cookie.to_dict()}
         if partition is not None:
             params["partition"] = partition.to_dict()
