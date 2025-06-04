@@ -48,14 +48,14 @@ class BiDiCommandMapper:
         Command.W3C_GET_WINDOW_HANDLES: "browsing_context_get_handles",
         Command.SCREENSHOT: "browsing_context_screenshot",
         Command.PRINT_PAGE: "browsing_context_print",
-        
+
         # Cookie commands (storage module)
         Command.GET_ALL_COOKIES: "storage_get_all_cookies",
         Command.GET_COOKIE: "storage_get_cookie",
         Command.ADD_COOKIE: "storage_add_cookie",
         Command.DELETE_COOKIE: "storage_delete_cookie",
         Command.DELETE_ALL_COOKIES: "storage_delete_all_cookies",
-        
+
         # Window management commands (browser module)
         Command.GET_WINDOW_RECT: "browser_get_window_rect",
         Command.SET_WINDOW_RECT: "browser_set_window_rect",
@@ -66,7 +66,7 @@ class BiDiCommandMapper:
 
     def __init__(self, webdriver_instance):
         """Initialize the BiDi command mapper.
-        
+
         Args:
             webdriver_instance: The WebDriver instance to use for BiDi operations.
         """
@@ -74,56 +74,56 @@ class BiDiCommandMapper:
 
     def can_execute_with_bidi(self, command: str) -> bool:
         """Check if a command can be executed with BiDi.
-        
+
         Args:
             command: The WebDriver command to check.
-            
+
         Returns:
             True if the command can be executed with BiDi, False otherwise.
         """
         in_mappings = command in self.COMMAND_MAPPINGS
         has_websocket = self.driver._websocket_connection is not None
         has_method = hasattr(self, self.COMMAND_MAPPINGS.get(command, "")) if in_mappings else False
-        
+
         logger.info(f"BiDi capability check for {command}:")
         logger.info(f"  - In command mappings: {in_mappings}")
         logger.info(f"  - Has websocket connection: {has_websocket}")
         logger.info(f"  - Has handler method: {has_method}")
-        
+
         if in_mappings:
             logger.info(f"  - Maps to method: {self.COMMAND_MAPPINGS[command]}")
-        
+
         result = in_mappings and has_websocket and has_method
         logger.info(f"  - Final result: {result}")
-        
+
         return result
 
     def execute_bidi_command(self, command: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Execute a command using BiDi.
-        
+
         Args:
             command: The WebDriver command to execute.
             params: Parameters for the command.
-            
+
         Returns:
             The result of the BiDi command execution.
-            
+
         Raises:
             NotImplementedError: If the command is not supported by BiDi.
             Exception: If the BiDi command execution fails.
         """
         logger.info(f"=== BiDi Command Mapper: execute_bidi_command for {command} ===")
-        
+
         if not self.can_execute_with_bidi(command):
             logger.error(f"BiDi mapping not available for command: {command}")
             raise NotImplementedError(f"BiDi mapping not available for command: {command}")
 
         bidi_method_name = self.COMMAND_MAPPINGS[command]
         bidi_method = getattr(self, bidi_method_name)
-        
+
         logger.info(f"Executing BiDi command: {command} -> {bidi_method_name}")
         logger.info(f"Parameters: {params}")
-        
+
         try:
             result = bidi_method(params or {})
             logger.info(f"BiDi command {command} executed successfully")
@@ -156,20 +156,20 @@ class BiDiCommandMapper:
         url = params.get("url")
         if not url:
             raise ValueError("URL parameter is required for navigation")
-        
+
         context_id = self._get_current_context_id()
         result = self.driver.browsing_context.navigate(context=context_id, url=url)
-        
+
         return {"value": None}  # Classic format expects None for successful navigation
 
     def browsing_context_get_url(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Get current URL using BiDi."""
         context_id = self._get_current_context_id()
         contexts = self.driver.browsing_context.get_tree(root=context_id)
-        
+
         if contexts:
             return {"value": contexts[0].url}
-        
+
         raise Exception("Could not retrieve current URL")
 
     def browsing_context_back(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -231,9 +231,9 @@ class BiDiCommandMapper:
         """Get all cookies using BiDi."""
         context_id = self._get_current_context_id()
         partition = BrowsingContextPartitionDescriptor(context=context_id)
-        
+
         result = self.driver.storage.get_cookies(partition=partition)
-        
+
         # Convert BiDi cookies to classic format
         classic_cookies = []
         for cookie in result.cookies:
@@ -242,7 +242,7 @@ class BiDiCommandMapper:
                 "value": cookie.value.value,  # Extract string value from BytesValue
                 "domain": cookie.domain,
             }
-            
+
             # Add optional fields if present
             if cookie.path is not None:
                 classic_cookie["path"] = cookie.path
@@ -254,9 +254,9 @@ class BiDiCommandMapper:
                 classic_cookie["sameSite"] = cookie.same_site
             if cookie.expiry is not None:
                 classic_cookie["expiry"] = cookie.expiry
-                
+
             classic_cookies.append(classic_cookie)
-        
+
         return {"value": classic_cookies}
 
     def storage_get_cookie(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -264,13 +264,13 @@ class BiDiCommandMapper:
         cookie_name = params.get("name")
         if not cookie_name:
             raise ValueError("Cookie name is required")
-        
+
         context_id = self._get_current_context_id()
         partition = BrowsingContextPartitionDescriptor(context=context_id)
         cookie_filter = CookieFilter(name=cookie_name)
-        
+
         result = self.driver.storage.get_cookies(filter=cookie_filter, partition=partition)
-        
+
         if result.cookies:
             cookie = result.cookies[0]
             classic_cookie = {
@@ -278,7 +278,7 @@ class BiDiCommandMapper:
                 "value": cookie.value.value,
                 "domain": cookie.domain,
             }
-            
+
             # Add optional fields if present
             if cookie.path is not None:
                 classic_cookie["path"] = cookie.path
@@ -290,26 +290,26 @@ class BiDiCommandMapper:
                 classic_cookie["sameSite"] = cookie.same_site
             if cookie.expiry is not None:
                 classic_cookie["expiry"] = cookie.expiry
-                
+
             return {"value": classic_cookie}
-        
+
         return {"value": None}
 
     def storage_add_cookie(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Add a cookie using BiDi."""
         cookie_dict = params.get("cookie", {})
-        
+
         # Convert classic cookie format to BiDi format
         name = cookie_dict.get("name")
         value = cookie_dict.get("value")
         domain = cookie_dict.get("domain")
-        
+
         if not all([name, value, domain]):
             raise ValueError("Cookie name, value, and domain are required")
-        
+
         # Create BytesValue for the cookie value
         bytes_value = BytesValue(BytesValue.TYPE_STRING, value)
-        
+
         # Create PartialCookie
         partial_cookie = PartialCookie(
             name=name,
@@ -321,10 +321,10 @@ class BiDiCommandMapper:
             same_site=cookie_dict.get("sameSite"),
             expiry=cookie_dict.get("expiry"),
         )
-        
+
         context_id = self._get_current_context_id()
         partition = BrowsingContextPartitionDescriptor(context=context_id)
-        
+
         self.driver.storage.set_cookie(cookie=partial_cookie, partition=partition)
         return {"value": None}
 
@@ -333,11 +333,11 @@ class BiDiCommandMapper:
         cookie_name = params.get("name")
         if not cookie_name:
             raise ValueError("Cookie name is required")
-        
+
         context_id = self._get_current_context_id()
         partition = BrowsingContextPartitionDescriptor(context=context_id)
         cookie_filter = CookieFilter(name=cookie_name)
-        
+
         self.driver.storage.delete_cookies(filter=cookie_filter, partition=partition)
         return {"value": None}
 
@@ -345,7 +345,7 @@ class BiDiCommandMapper:
         """Delete all cookies using BiDi."""
         context_id = self._get_current_context_id()
         partition = BrowsingContextPartitionDescriptor(context=context_id)
-        
+
         self.driver.storage.delete_cookies(partition=partition)
         return {"value": None}
 
@@ -354,7 +354,7 @@ class BiDiCommandMapper:
     def browser_get_window_rect(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Get window rectangle using BiDi."""
         client_windows = self.driver.browser.get_client_windows()
-        
+
         # Find the active window
         for window in client_windows:
             if window.is_active():
@@ -366,7 +366,7 @@ class BiDiCommandMapper:
                         "height": window.get_height(),
                     }
                 }
-        
+
         # If no active window found, use the first one
         if client_windows:
             window = client_windows[0]
@@ -378,7 +378,7 @@ class BiDiCommandMapper:
                     "height": window.get_height(),
                 }
             }
-        
+
         raise Exception("No client windows available")
 
     def browser_set_window_rect(self, params: Dict[str, Any]) -> Dict[str, Any]:
