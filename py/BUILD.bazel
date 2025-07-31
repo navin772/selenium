@@ -137,6 +137,12 @@ copy_file(
 )
 
 copy_file(
+    name = "bidi-mutation-listener",
+    src = "//javascript/bidi-support:bidi-mutation-listener.js",
+    out = "selenium/webdriver/common/bidi/bidi-mutation-listener.js",
+)
+
+copy_file(
     name = "firefox-driver-prefs",
     src = "//third_party/js/selenium:webdriver_json",
     out = "selenium/webdriver/firefox/webdriver_prefs.json",
@@ -204,6 +210,7 @@ py_library(
     ),
     data = [
         "selenium/py.typed",
+        ":bidi-mutation-listener",
         ":find-elements",
         ":firefox-driver-prefs",
         ":get-attribute",

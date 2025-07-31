@@ -68,6 +68,7 @@ py/selenium/webdriver/common/devtools/**/*
 py/selenium/webdriver/common/linux/
 py/selenium/webdriver/common/macos/
 py/selenium/webdriver/common/mutation-listener.js
+py/selenium/webdriver/common/bidi/bidi-mutation-listener.js
 py/selenium/webdriver/common/windows/
 py/selenium/webdriver/firefox/webdriver_prefs.json
 py/selenium/webdriver/remote/findElements.js
