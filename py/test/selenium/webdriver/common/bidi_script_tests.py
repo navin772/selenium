@@ -18,7 +18,7 @@
 import pytest
 
 from selenium.webdriver.common.bidi.log import LogLevel
-from selenium.webdriver.common.bidi.script import RealmType, ResultOwnership
+from selenium.webdriver.common.bidi.script import DomMutation, RealmType, ResultOwnership
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -870,3 +870,54 @@ def test_execute_script_with_nested_objects(driver, pages):
     assert value_dict["userName"] == "John"
     assert value_dict["userAge"] == 30
     assert value_dict["hobbyCount"] == 2
+
+
+@pytest.mark.xfail_firefox(reason="Firefox changes the old and new value")
+def test_add_dom_mutation_handler(driver, pages):
+    """Test adding a DOM mutation handler."""
+    mutations = []
+    driver.script.add_dom_mutation_handler(mutations.append)
+
+    pages.load("dynamic.html")
+
+    # Trigger a DOM mutation
+    reveal_button = driver.find_element(By.ID, "reveal")
+    reveal_button.click()
+
+    WebDriverWait(driver, 10).until(lambda _: mutations)
+
+    assert len(mutations) >= 1
+    mutation = mutations[0]
+    assert isinstance(mutation, DomMutation)
+    assert mutation.attribute_name == "style"
+    assert mutation.old_value == "display:none;"
+    assert mutation.current_value == ""
+
+    # Verify the element reference is valid
+    assert mutation.element is not None
+    assert mutation.element.get_attribute("id") == "revealed"
+
+
+def test_remove_dom_mutation_handler(driver, pages):
+    """Test removing a DOM mutation handler."""
+    mutations = []
+    handler_id = driver.script.add_dom_mutation_handler(mutations.append)
+
+    pages.load("dynamic.html")
+
+    reveal_button = driver.find_element(By.ID, "reveal")
+    reveal_button.click()
+
+    WebDriverWait(driver, 10).until(lambda _: mutations)
+
+    initial_count = len(mutations)
+
+    # Remove the handler
+    driver.script.remove_dom_mutation_handler(handler_id)
+
+    # Trigger a DOM mutation
+    reveal_button = driver.find_element(By.ID, "reveal")
+    reveal_button.click()
+
+    # No extra mutations should have been captured since the handler was removed
+    assert len(mutations) == initial_count  # this is 1

@@ -292,14 +292,14 @@ class Script:
         """
         self._ensure_mutation_script_loaded()
         self._subscribe_to_script_messages()
-        
+
         print(f"DEBUG: Current callbacks: {list(self.conn.callbacks.keys())}")
-        
+
         callback_id = self.conn.add_callback(ScriptMessage, self._handle_dom_mutation("dom_mutation_channel", handler))
-        
+
         print(f"DEBUG: Added callback with ID: {callback_id}")
         print(f"DEBUG: Callbacks after adding: {list(self.conn.callbacks.keys())}")
-        
+
         return callback_id
 
     def remove_dom_mutation_handler(self, handler_id):
@@ -636,10 +636,10 @@ class Script:
             mutation_script = pkgutil.get_data(_pkg, "bidi-mutation-listener.js")
             if mutation_script is None:
                 raise WebDriverException("Unable to find bidi-mutation-listener.js")
-            
-            script_text = mutation_script.decode('utf-8')
+
+            script_text = mutation_script.decode("utf-8")
             print(f"DEBUG: Loaded script text length: {len(script_text)}")
-            
+
             # Create a function call that sets up the mutation observer with our channel
             function_declaration = f"""
             (function(channel) {{
@@ -664,20 +664,13 @@ class Script:
                 }}
             }})
             """
-            
+
             # Create a channel value that matches the BiDi LocalValue format
-            channel_argument = {
-                "type": "channel",
-                "value": {
-                    "channel": "dom_mutation_channel",
-                    "ownership": "root"
-                }
-            }
-            
+            channel_argument = {"type": "channel", "value": {"channel": "dom_mutation_channel", "ownership": "root"}}
+
             print(f"DEBUG: Adding preload script with channel: {channel_argument}")
             self.dom_mutation_preload_id = self._add_preload_script(
-                function_declaration=function_declaration,
-                arguments=[channel_argument]
+                function_declaration=function_declaration, arguments=[channel_argument]
             )
             print(f"DEBUG: Preload script ID: {self.dom_mutation_preload_id}")
 
@@ -699,16 +692,17 @@ class Script:
 
     def _handle_dom_mutation(self, channel_name, handler):
         """Creates a handler for DOM mutation script messages."""
+
         def _handle_script_message(script_message):
             print(f"DEBUG: Received script message: channel={script_message.channel}, expected={channel_name}")
             print(f"DEBUG: Script message data: {script_message.data}")
-            
+
             if script_message.channel == channel_name:
                 try:
                     # The data should contain the JSON string sent from JavaScript
                     # Handle different possible data structures
                     data_value = None
-                    
+
                     if isinstance(script_message.data, dict):
                         # Try to get value from BiDi LocalValue structure
                         if "value" in script_message.data:
@@ -719,38 +713,38 @@ class Script:
                             data_value = str(script_message.data)
                     else:
                         data_value = str(script_message.data)
-                    
+
                     print(f"DEBUG: Extracted data_value: {data_value}")
-                    
+
                     # Handle immediate test message
                     if data_value == "immediate_test_message":
                         print("DEBUG: Received immediate test message - channel is working!")
                         return
-                    
+
                     # Parse the mutation data
                     if data_value:
                         mutation_data = json.loads(data_value) if isinstance(data_value, str) else data_value
                         print(f"DEBUG: Parsed mutation_data: {mutation_data}")
-                        
+
                         # Find the element by its webdriver ID
                         element_id = mutation_data.get("target")
-                        
+
                         if element_id and self.driver:
                             from selenium.webdriver.common.by import By
+
                             try:
                                 elements = self.driver.find_elements(
-                                    By.CSS_SELECTOR, 
-                                    f"[data-__webdriver_id='{element_id}']"
+                                    By.CSS_SELECTOR, f"[data-__webdriver_id='{element_id}']"
                                 )
                                 print(f"DEBUG: Found {len(elements)} elements with ID {element_id}")
-                                
+
                                 if elements:
                                     # Create DomMutation object
                                     mutation = DomMutation(
                                         element=elements[0],
                                         attribute_name=mutation_data.get("name"),
                                         current_value=mutation_data.get("value"),
-                                        old_value=mutation_data.get("oldValue")
+                                        old_value=mutation_data.get("oldValue"),
                                     )
                                     print(f"DEBUG: Created DomMutation: {mutation}")
                                     handler(mutation)
