@@ -19,6 +19,7 @@ import datetime
 import json
 import math
 import pkgutil
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Optional, Union
@@ -62,12 +63,40 @@ class LocalValue(ABC):
         if isinstance(value, (int, float)):
             return NumberLocalValue.from_python_number(value)
 
+        if isinstance(value, re.Pattern):
+            return RegExpLocalValue(pattern=value.pattern, flags=_re_flags_to_js_flags(value.flags))
+
         # Use type_map for other types
         handler = type_map.get(type(value))
         if handler:
             return handler(value)
 
         raise TypeError(f"Cannot convert value of type {type(value).__name__} to BiDi LocalValue")
+
+
+@dataclass
+class RegExpLocalValue(LocalValue):
+    pattern: str
+    flags: Optional[str] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        value = {"pattern": self.pattern}
+        if self.flags:
+            value["flags"] = self.flags
+        return {"type": "regexp", "value": value}
+
+
+def _re_flags_to_js_flags(flags: int) -> str:
+    js_flags = ""
+    if flags & re.IGNORECASE:
+        js_flags += "i"
+    if flags & re.MULTILINE:
+        js_flags += "m"
+    if flags & re.DOTALL:
+        js_flags += "s"
+    if flags & re.UNICODE:
+        js_flags += "u"
+    return js_flags
 
 
 @dataclass
