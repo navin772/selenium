@@ -40,29 +40,34 @@ class LocalValue(ABC):
 
     @classmethod
     def from_python(cls, value: Any) -> "LocalValue":
-        """Convert a Python value to appropriate LocalValue type."""
-        if value is None:
-            return NullLocalValue()
-        elif isinstance(value, bool):
-            return BooleanLocalValue(value)
-        elif isinstance(value, str):
-            return StringLocalValue(value)
-        elif isinstance(value, (int, float)):
+        """Convert a Python value to BiDi LocalValue type."""
+        if isinstance(value, LocalValue):
+            return value
+
+        type_map = {
+            type(None): lambda v: NullLocalValue(),
+            bool: lambda v: BooleanLocalValue(v),
+            str: lambda v: StringLocalValue(v),
+            datetime.datetime: lambda v: DateLocalValue(v.isoformat() + ("Z" if v.tzinfo is None else "")),
+            datetime.date: lambda v: DateLocalValue(
+                datetime.datetime.combine(v, datetime.time.min).replace(tzinfo=datetime.timezone.utc).isoformat()
+            ),
+            list: lambda v: ArrayLocalValue([cls.from_python(item) for item in v]),
+            tuple: lambda v: ArrayLocalValue([cls.from_python(item) for item in v]),
+            set: lambda v: SetLocalValue([cls.from_python(item) for item in v]),
+            dict: lambda v: ObjectLocalValue([[cls.from_python(k), cls.from_python(val)] for k, val in v.items()]),
+        }
+
+        # Handle int/float
+        if isinstance(value, (int, float)):
             return NumberLocalValue.from_python_number(value)
-        elif isinstance(value, datetime.datetime):
-            return DateLocalValue(value.isoformat() + ("Z" if value.tzinfo is None else ""))
-        elif isinstance(value, datetime.date):
-            dt = datetime.datetime.combine(value, datetime.time.min).replace(tzinfo=datetime.timezone.utc)
-            return DateLocalValue(dt.isoformat())
-        elif isinstance(value, (list, tuple)):
-            return ArrayLocalValue([cls.from_python(item) for item in value])
-        elif isinstance(value, set):
-            return SetLocalValue([cls.from_python(item) for item in value])
-        elif isinstance(value, dict):
-            return ObjectLocalValue([[cls.from_python(k), cls.from_python(v)] for k, v in value.items()])
-        else:
-            # Fallback to string representation
-            return StringLocalValue(str(value))
+
+        # Use type_map for other types
+        handler = type_map.get(type(value))
+        if handler:
+            return handler(value)
+
+        raise TypeError(f"Cannot convert value of type {type(value).__name__} to BiDi LocalValue")
 
 
 @dataclass
