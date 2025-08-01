@@ -19,14 +19,186 @@ import datetime
 import json
 import math
 import pkgutil
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.bidi.common import command_builder
 
 from .log import LogEntryAdded
 from .session import Session
+
+
+class LocalValue(ABC):
+    """Base class for BiDi LocalValue types."""
+
+    @abstractmethod
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to BiDi protocol dictionary format."""
+        pass
+
+    @classmethod
+    def from_python(cls, value: Any) -> "LocalValue":
+        """Convert a Python value to appropriate LocalValue type."""
+        if value is None:
+            return NullLocalValue()
+        elif isinstance(value, bool):
+            return BooleanLocalValue(value)
+        elif isinstance(value, str):
+            return StringLocalValue(value)
+        elif isinstance(value, (int, float)):
+            return NumberLocalValue.from_python_number(value)
+        elif isinstance(value, datetime.datetime):
+            return DateLocalValue(value.isoformat() + ("Z" if value.tzinfo is None else ""))
+        elif isinstance(value, datetime.date):
+            dt = datetime.datetime.combine(value, datetime.time.min).replace(tzinfo=datetime.timezone.utc)
+            return DateLocalValue(dt.isoformat())
+        elif isinstance(value, (list, tuple)):
+            return ArrayLocalValue([cls.from_python(item) for item in value])
+        elif isinstance(value, set):
+            return SetLocalValue([cls.from_python(item) for item in value])
+        elif isinstance(value, dict):
+            return ObjectLocalValue([[cls.from_python(k), cls.from_python(v)] for k, v in value.items()])
+        else:
+            # Fallback to string representation
+            return StringLocalValue(str(value))
+
+
+@dataclass
+class StringLocalValue(LocalValue):
+    value: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"type": "string", "value": self.value}
+
+
+@dataclass
+class NumberLocalValue(LocalValue):
+    value: Union[int, float, str]  # str for special numbers like "NaN", "Infinity"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"type": "number", "value": self.value}
+
+    @classmethod
+    def from_python_number(cls, value: Union[int, float]) -> "LocalValue":
+        """Create NumberLocalValue from Python number with special handling."""
+        if isinstance(value, float):
+            if math.isnan(value):
+                return cls("NaN")
+            elif math.isinf(value):
+                return cls("Infinity" if value > 0 else "-Infinity")
+            elif value == 0.0 and math.copysign(1.0, value) < 0:
+                return cls("-0")
+
+        # Handle BigInt case
+        JS_MAX_SAFE_INTEGER = 9007199254740991
+        if isinstance(value, int) and abs(value) > JS_MAX_SAFE_INTEGER:
+            return BigIntLocalValue(str(value))
+
+        return cls(value)
+
+
+@dataclass
+class BigIntLocalValue(LocalValue):
+    value: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"type": "bigint", "value": self.value}
+
+
+@dataclass
+class BooleanLocalValue(LocalValue):
+    value: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"type": "boolean", "value": self.value}
+
+
+class NullLocalValue(LocalValue):
+    def to_dict(self) -> dict[str, Any]:
+        return {"type": "null"}
+
+
+class UndefinedLocalValue(LocalValue):
+    def to_dict(self) -> dict[str, Any]:
+        return {"type": "undefined"}
+
+
+@dataclass
+class DateLocalValue(LocalValue):
+    value: str  # ISO 8601 format
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"type": "date", "value": self.value}
+
+
+@dataclass
+class ArrayLocalValue(LocalValue):
+    value: list[LocalValue]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"type": "array", "value": [item.to_dict() for item in self.value]}
+
+
+@dataclass
+class SetLocalValue(LocalValue):
+    value: list[LocalValue]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"type": "set", "value": [item.to_dict() for item in self.value]}
+
+
+@dataclass
+class ObjectLocalValue(LocalValue):
+    value: list[list[LocalValue]]  # list of key-value pairs
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"type": "object", "value": [[k.to_dict(), v.to_dict()] for k, v in self.value]}
+
+
+@dataclass
+class ChannelLocalValue(LocalValue):
+    channel: str
+    ownership: str = "root"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"type": "channel", "value": {"channel": self.channel, "ownership": self.ownership}}
+
+
+@dataclass
+class RemoteValue:
+    type: str
+    value: Optional[Any] = None
+    handle: Optional[str] = None
+    internal_id: Optional[str] = None
+    shared_id: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "RemoteValue":
+        """Create RemoteValue from BiDi protocol dictionary."""
+        return cls(
+            type=data.get("type", ""),
+            value=data.get("value"),
+            handle=data.get("handle"),
+            internal_id=data.get("internalId"),
+            shared_id=data.get("sharedId"),
+        )
+
+    def get_python_value(self) -> Any:
+        """Extract Python value from RemoteValue."""
+        if self.type == "string":
+            return self.value
+        elif self.type == "number":
+            return self.value
+        elif self.type == "boolean":
+            return self.value
+        elif self.type == "null":
+            return None
+        elif self.type == "undefined":
+            return None
+        else:
+            return self.value
 
 
 class _DomMutationHandler:
@@ -43,9 +215,7 @@ class _DomMutationHandler:
         """Adds a DOM mutation handler."""
         self._ensure_mutation_script_loaded()
         self._subscribe_to_script_messages()
-
-        callback_id = self.conn.add_callback(ScriptMessage, self._create_message_handler(handler))
-        return callback_id
+        return self.conn.add_callback(ScriptMessage, self._create_message_handler(handler))
 
     def remove_handler(self, handler_id):
         """Removes a DOM mutation handler."""
@@ -53,6 +223,7 @@ class _DomMutationHandler:
         self._unsubscribe_from_script_messages()
 
     def _ensure_mutation_script_loaded(self):
+        """Load the JavaScript mutation listener if not already loaded."""
         if self.dom_mutation_preload_id is not None:
             return
 
@@ -64,11 +235,10 @@ class _DomMutationHandler:
 
         script_text = mutation_script.decode("utf-8")
 
-        # Create a function call that sets up the mutation observer with channel
+        # Create function declaration that sets up the mutation observer
         function_declaration = f"""
         (function(channel) {{
             {script_text}
-
             try {{
                 observeMutations(channel);
             }} catch (e) {{
@@ -77,8 +247,7 @@ class _DomMutationHandler:
         }})
         """
 
-        # Create a channel value that matches the BiDi LocalValue format
-        channel_argument = {"type": "channel", "value": {"channel": self.channel_name, "ownership": "root"}}
+        channel_argument = ChannelLocalValue(self.channel_name).to_dict()
 
         # Add preload script
         params = {"functionDeclaration": function_declaration, "arguments": [channel_argument]}
@@ -103,43 +272,39 @@ class _DomMutationHandler:
                 return
 
             try:
-                data_value = self._extract_message_data(script_message.data)
+                # Convert incoming data to RemoteValue
+                remote_value = RemoteValue.from_dict(script_message.data)
+                mutation_data = remote_value.get_python_value()
 
-                # Parse and process mutation data
-                if data_value:
-                    mutation_data = json.loads(data_value) if isinstance(data_value, str) else data_value
-                    mutation = self._create_dom_mutation_from_data(mutation_data)
-                    if mutation:
-                        handler(mutation)
+                # Handle both direct values and JSON strings
+                if isinstance(mutation_data, str):
+                    try:
+                        mutation_data = json.loads(mutation_data)
+                    except json.JSONDecodeError:
+                        return
+
+                # Create DOM mutation object and call handler
+                mutation = self._create_dom_mutation(mutation_data)
+                if mutation:
+                    handler(mutation)
 
             except (json.JSONDecodeError, KeyError, AttributeError, TypeError):
-                # Silently ignore malformed messages
                 pass
 
         return _handle_script_message
 
-    def _extract_message_data(self, data):
-        if isinstance(data, dict):
-            # Try to get value from BiDi LocalValue structure
-            if "value" in data:
-                return data["value"]
-            elif "type" in data and data["type"] == "string":
-                return data.get("value", "")
-            else:
-                return str(data)
-        else:
-            return str(data)
+    def _create_dom_mutation(self, mutation_data):
+        if not isinstance(mutation_data, dict):
+            return None
 
-    def _create_dom_mutation_from_data(self, mutation_data):
-        """Creates a DomMutation object from mutation data."""
         element_id = mutation_data.get("target")
-
         if not element_id or not self.driver:
             return None
 
-        from selenium.webdriver.common.by import By
-
         try:
+            from selenium.webdriver.common.by import By
+
+            # Find element by the WebDriver ID attribute
             elements = self.driver.find_elements(By.CSS_SELECTOR, f"[data-__webdriver_id='{element_id}']")
 
             if not elements:
@@ -151,6 +316,7 @@ class _DomMutationHandler:
                 current_value=mutation_data.get("value"),
                 old_value=mutation_data.get("oldValue"),
             )
+
         except Exception:
             return None
 
@@ -373,18 +539,10 @@ class RealmDestroyed:
 class Script:
     """BiDi implementation of the script module."""
 
-    EVENTS = {
-        "message": "script.message",
-        "realm_created": "script.realmCreated",
-        "realm_destroyed": "script.realmDestroyed",
-    }
-
     def __init__(self, conn, driver=None):
         self.conn = conn
         self.driver = driver
         self.log_entry_subscribed = False
-        self.subscriptions = {}
-        self.callbacks = {}
         self._dom_mutation_handler = _DomMutationHandler(conn, driver)
 
     # High-level APIs for SCRIPT module
@@ -472,7 +630,7 @@ class Script:
         # Convert arguments to the format expected by BiDi call_function (LocalValue Type)
         arguments = []
         for arg in args:
-            arguments.append(self.__convert_to_local_value(arg))
+            arguments.append(LocalValue.from_python(arg).to_dict())
 
         target = {"context": browsing_context_id}
 
@@ -491,56 +649,6 @@ class Script:
                     error_message += f": {result.exception_details['message']}"
 
             raise WebDriverException(error_message)
-
-    def __convert_to_local_value(self, value) -> dict:
-        """
-        Converts a Python value to BiDi LocalValue format.
-        """
-        if value is None:
-            return {"type": "null"}
-        elif isinstance(value, bool):
-            return {"type": "boolean", "value": value}
-        elif isinstance(value, (int, float)):
-            if isinstance(value, float):
-                if math.isnan(value):
-                    return {"type": "number", "value": "NaN"}
-                elif math.isinf(value):
-                    if value > 0:
-                        return {"type": "number", "value": "Infinity"}
-                    else:
-                        return {"type": "number", "value": "-Infinity"}
-                elif value == 0.0 and math.copysign(1.0, value) < 0:
-                    return {"type": "number", "value": "-0"}
-
-            JS_MAX_SAFE_INTEGER = 9007199254740991
-            if isinstance(value, int) and (value > JS_MAX_SAFE_INTEGER or value < -JS_MAX_SAFE_INTEGER):
-                return {"type": "bigint", "value": str(value)}
-
-            return {"type": "number", "value": value}
-
-        elif isinstance(value, str):
-            return {"type": "string", "value": value}
-        elif isinstance(value, datetime.datetime):
-            # Convert Python datetime to JavaScript Date (ISO 8601 format)
-            return {"type": "date", "value": value.isoformat() + "Z" if value.tzinfo is None else value.isoformat()}
-        elif isinstance(value, datetime.date):
-            # Convert Python date to JavaScript Date
-            dt = datetime.datetime.combine(value, datetime.time.min).replace(tzinfo=datetime.timezone.utc)
-            return {"type": "date", "value": dt.isoformat()}
-        elif isinstance(value, set):
-            return {"type": "set", "value": [self.__convert_to_local_value(item) for item in value]}
-        elif isinstance(value, (list, tuple)):
-            return {"type": "array", "value": [self.__convert_to_local_value(item) for item in value]}
-        elif isinstance(value, dict):
-            return {
-                "type": "object",
-                "value": [
-                    [self.__convert_to_local_value(k), self.__convert_to_local_value(v)] for k, v in value.items()
-                ],
-            }
-        else:
-            # For other types, convert to string
-            return {"type": "string", "value": str(value)}
 
     # low-level APIs for script module
     def _add_preload_script(
