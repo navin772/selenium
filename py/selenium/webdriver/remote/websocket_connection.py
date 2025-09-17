@@ -98,6 +98,10 @@ class WebSocketConnection:
                     self.callbacks[event_name].remove(callback)
                     return
 
+    def clear_all_callbacks(self):
+        """Clear all registered callbacks."""
+        self.callbacks.clear()
+
     def _serialize_command(self, command):
         return next(command)
 

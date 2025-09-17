@@ -263,6 +263,16 @@ class Script:
 
     remove_javascript_error_handler = remove_console_message_handler
 
+    def remove_all_handlers(self):
+        """Remove all event handlers for the script module."""
+        # Clear all log entry callbacks
+        if LogEntryAdded.event_class in self.conn.callbacks:
+            self.conn.callbacks[LogEntryAdded.event_class].clear()
+        
+        # Unsubscribe from log entries if subscribed
+        if self.log_entry_subscribed:
+            self._unsubscribe_from_log_entries()
+
     def pin(self, script: str) -> str:
         """Pins a script to the current browsing context.
 

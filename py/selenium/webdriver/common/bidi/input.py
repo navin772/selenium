@@ -472,3 +472,15 @@ class Input:
                 del self.subscriptions[FileDialogOpened.event_class]
 
         self.conn.remove_callback(FileDialogOpened, callback_id)
+
+    def remove_all_handlers(self):
+        """Remove all event handlers for the input module."""
+        # Clear all callbacks
+        self.callbacks.clear()
+        
+        # Unsubscribe from all events and clear subscriptions
+        if self.subscriptions:
+            session = Session(self.conn)
+            for event_class in list(self.subscriptions.keys()):
+                self.conn.execute(session.unsubscribe(event_class))
+            self.subscriptions.clear()

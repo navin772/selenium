@@ -1445,6 +1445,38 @@ class WebDriver(BaseWebDriver):
 
         return self._input
 
+    def _cleanup_bidi_handlers(self):
+        """Clean up all BiDi event handlers to prevent leakage between tests."""
+        if not self._websocket_connection:
+            return  # No BiDi connection, nothing to clean up
+
+        try:
+            # Clean up script handlers
+            if self._script:
+                self._script.remove_all_handlers()
+
+            # Clean up network handlers
+            if self._network:
+                self._network.remove_all_handlers()
+
+            # Clean up browsing context handlers
+            if self._browsing_context:
+                self._browsing_context.clear_event_handlers()
+
+            # Clean up input handlers
+            if self._input:
+                self._input.remove_all_handlers()
+
+            # Clean up any remaining callbacks from the WebSocket connection
+            # This acts as a safety net for any handlers we might have missed
+            self._websocket_connection.clear_all_callbacks()
+
+        except Exception as e:
+            # Log the error but don't let cleanup failure crash the test
+            # We'll import logging here to avoid circular imports
+            import logging
+            logging.getLogger(__name__).warning(f"Error during BiDi handler cleanup: {e}")
+
     def _get_cdp_details(self):
         import json
 

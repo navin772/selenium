@@ -228,6 +228,15 @@ class Network:
             self.conn.execute(command_builder("session.unsubscribe", params))
         self.subscriptions = {}
 
+    def remove_all_handlers(self):
+        """Remove all event handlers and cleanup network state."""
+        self.clear_request_handlers()
+        # Clear any remaining intercepts
+        self._remove_intercept()
+        # Reset state
+        self.callbacks = {}
+        self.subscriptions = {}
+
     def add_auth_handler(self, username, password):
         """Add an authentication handler to the network.
 

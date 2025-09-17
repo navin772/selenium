@@ -340,12 +340,19 @@ def driver(request):
 
         request.addfinalizer(selenium_driver.stop_driver)
 
-    # Close the browser after BiDi tests. Those make event subscriptions
-    # and doesn't seems to be stable enough, causing the flakiness of the
-    # subsequent tests.
-    # Remove this when BiDi implementation and API is stable.
+    # Clean up BiDi event handlers after BiDi tests to prevent leakage between tests
+    # This allows browser reuse while maintaining test isolation
     if selenium_driver is not None and selenium_driver.bidi:
-        request.addfinalizer(selenium_driver.stop_driver)
+        def cleanup_bidi_handlers():
+            # Check if selenium_driver and its driver still exist
+            if selenium_driver is not None and hasattr(selenium_driver, 'driver') and selenium_driver.driver is not None:
+                try:
+                    selenium_driver.driver._cleanup_bidi_handlers()
+                except Exception as e:
+                    # Log the error but don't fail the test
+                    import logging
+                    logging.getLogger(__name__).warning(f"Error during BiDi handler cleanup: {e}")
+        request.addfinalizer(cleanup_bidi_handlers)
 
     yield selenium_driver.driver
 
@@ -375,8 +382,19 @@ def pytest_exception_interact(node, call, report):
     if report.failed:
         global selenium_driver
         if selenium_driver is not None:
-            selenium_driver.stop_driver()
-        selenium_driver = None
+            # For BiDi tests, clean up handlers but don't stop the driver to allow reuse
+            if selenium_driver.bidi:
+                try:
+                    if hasattr(selenium_driver, 'driver') and selenium_driver.driver is not None:
+                        selenium_driver.driver._cleanup_bidi_handlers()
+                except Exception as e:
+                    # Log the error but don't fail
+                    import logging
+                    logging.getLogger(__name__).warning(f"Error during BiDi handler cleanup on failure: {e}")
+            else:
+                # For non-BiDi tests, stop the driver as before
+                selenium_driver.stop_driver()
+                selenium_driver = None
 
 
 @pytest.fixture
